@@ -18,6 +18,8 @@ package backuprespository
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"testing"
 
@@ -27,6 +29,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 )
+
+var flag int = 0
 
 type ClientTestSuite struct {
 	suite.Suite
@@ -48,6 +52,17 @@ func (f *FakeMetaBackup_DownloadClient) Recv() (*pb.DownloadResponse, error) {
 }
 
 func (f *FakeMetaBackup_UploadClient) Send(ur *pb.UploadRequest) error {
+	/*
+		flag++
+		fmt.Printf("flag value:%v\n", flag)
+		if flag == 1 && (reflect.TypeOf(ur.Data) != reflect.TypeOf(&pb.UploadRequest_Info{})) {
+			return fmt.Errorf("Data of type 'UploadRequest_Info' is expected from UploadRequest\n")
+		}
+
+		if flag == 2 && (reflect.TypeOf(ur.Data) != reflect.TypeOf(&pb.UploadRequest_ChunkData{})) {
+			return fmt.Errorf("Data of type 'UploadRequest_ChunkData' is expected from UploadRequest\n")
+		}
+	*/
 	args := f.Called(ur)
 	return args.Error(0)
 }
@@ -91,6 +106,49 @@ func (suite *ClientTestSuite) TestUploadInvalidPath() {
 	assert.NotNil(suite.T(), err)
 }
 
+func (suite *ClientTestSuite) TestUploadCLientUploadErr() {
+	client := new(FakeMetaBackupClient)
+	fakeRespoClient := new(FakeMetaBackup_UploadClient)
+	expErr := fmt.Errorf("this is error from mocked upload")
+	client.On("Upload", mock.Anything, mock.Anything).Return(fakeRespoClient, expErr)
+	repo := &backupRepository{
+		backupRepositoryAddress: "127.0.0.1:8181",
+		client:                  client,
+	}
+	filePath := "fakeFile"
+	file, err := os.Create(filePath)
+	assert.Nil(suite.T(), err)
+	defer file.Close()
+	str := "this is sample data"
+	data := []byte(str)
+	err = os.WriteFile(filePath, data, 0777)
+	err = repo.Upload(filePath)
+	assert.Equal(suite.T(), err, expErr)
+}
+
+func (suite *ClientTestSuite) TestUploadCLientSendErr() {
+	client := new(FakeMetaBackupClient)
+	fakeRespoClient := new(FakeMetaBackup_UploadClient)
+
+	client.On("Upload", mock.Anything, mock.Anything).Return(fakeRespoClient, nil)
+	repo := &backupRepository{
+		backupRepositoryAddress: "127.0.0.1:8181",
+		client:                  client,
+	}
+	expErr := fmt.Errorf("this is error from mocked send func")
+	fakeRespoClient.On("Send", mock.Anything).Return(expErr)
+	//fakeRespoClient.On("CloseAndRecv", mock.Anything).Return(&pb.Empty{}, nil)
+	filePath := "fakeFile"
+	file, err := os.Create(filePath)
+	assert.Nil(suite.T(), err)
+	defer file.Close()
+	str := "this is sample data"
+	data := []byte(str)
+	err = os.WriteFile(filePath, data, 0777)
+	err = repo.Upload(filePath)
+	assert.Equal(suite.T(), err, expErr)
+}
+
 func (suite *ClientTestSuite) TestDownloadFail() {
 	repo, _, _ := NewBackupRepository("/tmp/nfs_test.sock")
 	fileId := "fakeFilePath/fakeFile"
@@ -100,9 +158,45 @@ func (suite *ClientTestSuite) TestDownloadFail() {
 	assert.NotNil(suite.T(), err)
 }
 
+func (suite *ClientTestSuite) TestDownloadCLientDownloadErr() {
+	client := new(FakeMetaBackupClient)
+	fakeRespoClient := new(FakeMetaBackup_DownloadClient)
+	expErr := fmt.Errorf("this is error from mocked download func")
+	client.On("Download", mock.Anything, mock.Anything, mock.Anything).Return(fakeRespoClient, expErr)
+	repo := &backupRepository{
+		backupRepositoryAddress: "127.0.0.1:8181",
+		client:                  client,
+	}
+	fakeRespoClient.On("Recv", mock.Anything).Return(&pb.DownloadResponse{}, nil)
+	fakeRespoClient.On("CloseSend").Return(nil)
+	fileID := "fakeFile"
+	attributes := make(map[string]string)
+	//out := "fakeFile"
+	_, err := repo.Download(fileID, attributes)
+	assert.Equal(suite.T(), err, expErr)
+}
+
+func (suite *ClientTestSuite) TestDownloadCLientRecvErr() {
+	client := new(FakeMetaBackupClient)
+	fakeRespoClient := new(FakeMetaBackup_DownloadClient)
+	expErr := fmt.Errorf("this is error from mocked Recv func")
+	client.On("Download", mock.Anything, mock.Anything, mock.Anything).Return(fakeRespoClient, nil)
+	repo := &backupRepository{
+		backupRepositoryAddress: "127.0.0.1:8181",
+		client:                  client,
+	}
+	fakeRespoClient.On("Recv", mock.Anything).Return(&pb.DownloadResponse{}, expErr)
+	fakeRespoClient.On("CloseSend").Return(nil)
+	fileID := "fakeFile"
+	attributes := make(map[string]string)
+	//out := "fakeFile"
+	_, err := repo.Download(fileID, attributes)
+	assert.Equal(suite.T(), err, expErr)
+}
+
 func (suite *ClientTestSuite) TestUploadValid() {
-	client := &FakeMetaBackupClient{}
-	fakeRespoClient := &FakeMetaBackup_UploadClient{}
+	client := new(FakeMetaBackupClient)
+	fakeRespoClient := new(FakeMetaBackup_UploadClient)
 	client.On("Upload", mock.Anything, mock.Anything).Return(fakeRespoClient, nil)
 	repo := &backupRepository{
 		backupRepositoryAddress: "127.0.0.1:8181",
@@ -121,22 +215,63 @@ func (suite *ClientTestSuite) TestUploadValid() {
 	assert.Nil(suite.T(), err)
 
 }
+
+func retVal() (*pb.DownloadResponse, error) {
+	flag++
+	fmt.Printf("flag %d :\n", flag)
+	downloadRes := &pb.DownloadResponse{
+		Data: &pb.DownloadResponse_Info{
+			Info: &pb.DownloadResponse_FileInfo{
+				FileIdentifier: "fakefile",
+			},
+		},
+	}
+
+	downloadRes1 := &pb.DownloadResponse{
+		Data: &pb.DownloadResponse_ChunkData{
+			ChunkData: ([]byte)("fakefile"),
+		},
+	}
+	if flag == 1 {
+		fmt.Printf("flag x %d :\n", flag)
+		return downloadRes, nil
+	}
+
+	if flag == 2 {
+		fmt.Printf("flag y %d :\n", flag)
+		return downloadRes1, io.EOF
+	}
+	return downloadRes, nil
+}
 func (suite *ClientTestSuite) TestDownloadValid() {
-	client := &FakeMetaBackupClient{}
-	fakeRespoClient := &FakeMetaBackup_DownloadClient{}
+	client := new(FakeMetaBackupClient)
+	fakeRespoClient := new(FakeMetaBackup_DownloadClient)
 	client.On("Download", mock.Anything, mock.Anything, mock.Anything).Return(fakeRespoClient, nil)
 	repo := &backupRepository{
 		backupRepositoryAddress: "127.0.0.1:8181",
 		client:                  client,
 	}
-	fakeRespoClient.On("Recv", mock.Anything).Return(&pb.DownloadResponse{}, nil)
+	/*
+		downloadRes := &pb.DownloadResponse{
+			Data: &pb.DownloadResponse_Info{
+				Info: &pb.DownloadResponse_FileInfo{
+					FileIdentifier: "fakefile",
+				},
+			},
+		}
+
+		downloadRes1 := &pb.DownloadResponse{
+			Data: &pb.DownloadResponse_ChunkData{
+				ChunkData: ([]byte)("fakefile"),
+			},
+		}
+	*/
+	fakeRespoClient.On("Recv").Return(retVal())
 	fakeRespoClient.On("CloseSend").Return(nil)
 	fileID := "fakeFile"
 	attributes := make(map[string]string)
-	//out := "fakeFile"
 	_, err := repo.Download(fileID, attributes)
-	assert.NotNil(suite.T(), err)
-
+	assert.Nil(suite.T(), err)
 }
 
 func TestTarTestSuite(t *testing.T) {
