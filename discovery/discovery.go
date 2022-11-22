@@ -18,7 +18,6 @@ package discovery
 
 import (
 	"fmt"
-	"k8s.io/client-go/tools/cache"
 	"reflect"
 	"sync"
 
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
