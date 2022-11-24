@@ -68,7 +68,8 @@ var _ = Describe("ServiceAccountBackup", Label("serviceAccount"), func() {
 				//create backup for the serviceAccount
 				backupName := "backup" + "serviceaccount" + "-" + UUIDgen.String()
 				includeNs := "default"
-				backup := kahu.NewBackup(backupName, includeNs, "ServiceAccount")
+				resourceType := "ServiceAccount"
+				backup := kahu.NewBackup(backupName, includeNs, resourceType)
 				opts := metav1.CreateOptions{}
 
 				_, err = kahuClient.KahuV1beta1().Backups().Create(ctx, backup, opts)

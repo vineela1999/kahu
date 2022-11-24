@@ -69,7 +69,8 @@ var _ = Describe("ConfigMapBackup", Label("configmap"), func() {
 				//create backup for the configMap
 				backupName := "backup" + "configmap" + "-" + UUIDgen.String()
 				includeNs := "default"
-				backup := kahu.NewBackup(backupName, includeNs, "ConfigMap")
+				resourceType := "ConfigMap"
+				backup := kahu.NewBackup(backupName, includeNs, resourceType)
 				opts := metav1.CreateOptions{}
 				ctx := context.TODO()
 				_, err = kahuClient.KahuV1beta1().Backups().Create(ctx, backup, opts)

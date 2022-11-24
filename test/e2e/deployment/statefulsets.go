@@ -59,6 +59,7 @@ var _ = Describe("statefulsetBackup", Label("statefulset"), func() {
 				labels := make(map[string]string)
 				image := "nginx"
 				replicas := 2
+				labels["statefulset"] = "statefulset"
 
 				UUIDgen, _ := uuid.NewRandom()
 				name := "statefulset" + "-" + UUIDgen.String()
@@ -73,7 +74,8 @@ var _ = Describe("statefulsetBackup", Label("statefulset"), func() {
 				//create backup for the statefulset
 				backupName := "backup" + "statefulset" + "-" + UUIDgen.String()
 				includeNs := "default"
-				backup := kahu.NewBackup(backupName, includeNs, "StatefulSet")
+				resourceType := "StatefulSet"
+				backup := kahu.NewBackup(backupName, includeNs, resourceType)
 				opts := metav1.CreateOptions{}
 				ctx := context.TODO()
 				_, err = kahuClient.KahuV1beta1().Backups().Create(ctx, backup, opts)

@@ -69,7 +69,8 @@ var _ = Describe("PodBackup", Label("pod"), func() {
 				//create backup for the pod
 				backupName := "backup" + "pod" + "-" + UUIDgen.String()
 				includeNs := "default"
-				backup := kahu.NewBackup(backupName, includeNs, "Pod")
+				resourceType := "Pod"
+				backup := kahu.NewBackup(backupName, includeNs, resourceType)
 				opts := metav1.CreateOptions{}
 				ctx := context.TODO()
 				_, err = kahuClient.KahuV1beta1().Backups().Create(ctx, backup, opts)

@@ -78,7 +78,8 @@ var _ = Describe("DeploymentBackup", Label("deployment"), func() {
 				//create backup for the deployment
 				backupName := "backup" + "-" + UUIDgen.String()
 				includeNs := "default"
-				backup := kahu.NewBackup(backupName, includeNs, "Deployment")
+				resourceType := "Deployment"
+				backup := kahu.NewBackup(backupName, includeNs, resourceType)
 				opts := metav1.CreateOptions{}
 				ctx := context.TODO()
 				_, err = kahuClient.KahuV1beta1().Backups().Create(ctx, backup, opts)
